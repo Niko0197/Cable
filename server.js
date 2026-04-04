@@ -7,25 +7,63 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Добавляем поддержку CORS для работы с Live Server или file:///
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
+
 // База данных параметров для российских серий домов
 const buildingSeries = {
+    'pik': {
+        name: 'Современный монолит (типа ПИК)',
+        floors: 25,
+        entrances: 1,
+        aptsPerFloor: 12,
+        floorHeight: 2.9,
+        corridorLength: 20,
+        routingType: 'internal'
+    },
     'p44': {
-        name: 'П-44/П-44Т',
+        name: 'П-44/П-44Т (17 эт, 4 под)',
         floors: 17,
         entrances: 4,
         aptsPerFloor: 4,
         floorHeight: 2.8,
         corridorLength: 10,
-        routingType: 'internal' // внутренние кабель-каналы (стояки)
+        routingType: 'internal'
+    },
+    'i155': {
+        name: 'И-155 (Башня 24 эт)',
+        floors: 24,
+        entrances: 1,
+        aptsPerFloor: 8,
+        floorHeight: 2.8,
+        corridorLength: 15,
+        routingType: 'internal'
+    },
+    'brezhnevka': {
+        name: 'Брежневка (II-49, 9 эт)',
+        floors: 9,
+        entrances: 4,
+        aptsPerFloor: 4,
+        floorHeight: 2.6,
+        corridorLength: 10,
+        routingType: 'internal'
     },
     'khrushchev': {
-        name: 'Хрущевка 1-510/1-515',
+        name: 'Хрущевка 1-510/1-515 (5 эт)',
         floors: 5,
         entrances: 4,
         aptsPerFloor: 4,
         floorHeight: 2.5,
         corridorLength: 8,
-        routingType: 'external' // внешняя прокладка по фасаду/чердаку
+        routingType: 'external'
     },
     'stalin': {
         name: 'Сталинка',
@@ -34,62 +72,54 @@ const buildingSeries = {
         aptsPerFloor: 3,
         floorHeight: 3.2,
         corridorLength: 12,
-        routingType: 'internal' // внутренние стояки, высокие потолки, толстые стены
+        routingType: 'internal'
+    }
+};
+
+// Прайс-лист в рублях
+const prices = {
+    cableTrunkOptic: 45,      // Магистральная оптика (руб/м)
+    cableDistOptic: 30,       // Распределительная оптика (руб/м)
+    cableDropOptic: 15,       // Дроп-кабель FTTH (руб/м)
+    cableUtp: 20,             // UTP медь (руб/м)
+    switchAccess: 15000,      // Коммутатор доступа 24 порта
+    switchAggr: 40000,        // Коммутатор агрегации
+    spliceBox: 3500,          // Оптическая муфта / кросс
+    floorBox: 800,            // Этажная коробка
+    connectorFast: 100,       // Fast-коннектор (оптика)
+    connectorRj45: 15,        // RJ-45 коннектор
+    spliceWork: 250,          // Сварка оптики (1 волокно)
+    splitters: {
+        2: 400, 4: 500, 8: 700, 16: 1200, 32: 2500, 64: 5000
     }
 };
 
 // Параметры потерь для FTTH (дБ)
 const opticalLosses = {
-    cablePerKm: 0.3, // Потери в оптическом кабеле на 1 км (для длины волны 1310/1550 нм)
-    connector: 0.5, // Потери на коннекторах
-    splice: 0.1,    // Потери на сварку
-    // Теоретические (с небольшим запасом) потери на оптических сплиттерах
+    cablePerKm: 0.3,
+    connector: 0.5,
+    splice: 0.1,
     splitters: {
-        2: 3.5,
-        4: 7.2,
-        8: 10.5,
-        16: 13.8,
-        32: 17.1,
-        64: 20.5
+        2: 3.5, 4: 7.2, 8: 10.5, 16: 13.8, 32: 17.1, 64: 20.5
     }
 };
 
-/**
- * Алгоритм расчета сплиттеров для FTTH
- * Подбирает оптимальную двухуровневую древовидную топологию.
- * 1 уровень - магистральный сплиттер (в муфте в подвале/на чердаке).
- * 2 уровень - этажные сплиттеры (или подъездные).
- */
 function calculateSplitters(totalSubscribers, entrances, floors) {
     const splitters = { 2: 0, 4: 0, 8: 0, 16: 0, 32: 0, 64: 0 };
-    
-    // Для простоты моделирования: 
-    // Предположим, мы ставим 1 магистральный сплиттер на дом (или на подъезд, если дом большой)
-    // И сплиттеры второго уровня на каждые несколько этажей или на каждый этаж
-    
-    // Рассчитаем абонентов на подъезд
     const subsPerEntrance = Math.ceil(totalSubscribers / entrances);
     
     let l1SplitterRatio = 1;
     let l2SplitterRatio = 1;
 
-    // Подбираем сплиттер 2-го уровня (в подъезде/на этажах)
-    // Смотрим сколько абонентов на этаже
     const aptsPerFloor = Math.ceil(subsPerEntrance / floors);
-    
-    // Если на этаже 4 квартиры, логично поставить 1:4 на этаж или 1:8 на два этажа
     const availableRatios = [2, 4, 8, 16, 32, 64];
     
-    // Ищем подходящий сплиттер для группы абонентов (например, 1 сплиттер на 2 этажа)
     let subsPerGroup = aptsPerFloor * 2; 
     l2SplitterRatio = availableRatios.find(r => r >= subsPerGroup) || 64;
     
-    // Количество сплиттеров 2 уровня в подъезде
     const l2CountPerEntrance = Math.ceil(subsPerEntrance / l2SplitterRatio);
     const totalL2Count = l2CountPerEntrance * entrances;
     
-    // Подбираем магистральный сплиттер (1 уровень)
-    // Он должен запитать все сплиттеры 2 уровня
     l1SplitterRatio = availableRatios.find(r => r >= totalL2Count) || 64;
     let l1Count = Math.ceil(totalL2Count / l1SplitterRatio);
 
@@ -105,9 +135,6 @@ function calculateSplitters(totalSubscribers, entrances, floors) {
     };
 }
 
-/**
- * Расчет оптического бюджета (затухания) для самой дальней точки
- */
 function calculateOpticalBudget(totalDistanceKm, l1Ratio, l2Ratio, splicesCount, connectorsCount) {
     const cableLoss = totalDistanceKm * opticalLosses.cablePerKm;
     const splicesLoss = splicesCount * opticalLosses.splice;
@@ -120,14 +147,8 @@ function calculateOpticalBudget(totalDistanceKm, l1Ratio, l2Ratio, splicesCount,
 }
 
 app.post('/calculate', (req, res) => {
-    const { 
-        series, 
-        technology, // 'FTTB' или 'FTTH'
-        distanceAts, // в метрах
-        customParams 
-    } = req.body;
+    const { series, technology, distanceAts, customParams } = req.body;
 
-    // Определяем параметры здания
     let bParams = series === 'custom' ? customParams : buildingSeries[series];
     if (!bParams) {
         return res.status(400).json({ error: 'Неверные параметры здания' });
@@ -136,65 +157,43 @@ app.post('/calculate', (req, res) => {
     const { floors, entrances, aptsPerFloor, floorHeight, corridorLength, routingType } = bParams;
     const totalSubscribers = floors * entrances * aptsPerFloor;
 
-    // --- 1. Расчет длины кабеля ---
-    // Магистраль до дома
     const trunkCable = parseFloat(distanceAts); 
-    
-    // Вертикальная прокладка (стояки)
-    // В каждом подъезде кабель идет с 1 до последнего этажа.
     const verticalCablePerEntrance = floors * floorHeight;
     const totalVerticalCable = verticalCablePerEntrance * entrances;
-
-    // Горизонтальная прокладка
-    // От стояка до квартиры в среднем половина длины коридора
     const averageDistanceToApt = corridorLength / 2;
+    
     let horizontalCable = 0;
-    let distributionCable = 0; // Кабель внутри здания до этажных коробок
+    let distributionCable = 0; 
 
     if (technology === 'FTTB') {
-        // FTTB: Оптика идет до коммутатора в подвале/чердаке, далее витая пара (Ethernet) до каждой квартиры
-        // Предполагаем коммутаторы на каждый подъезд
-        distributionCable = entrances * corridorLength; // Условно, связь между подъездами
-        // Витая пара: от коммутатора (подвал) до квартиры (вертикаль + горизонталь)
-        // Средняя длина вертикали: (floors * floorHeight) / 2
+        distributionCable = entrances * corridorLength; 
         const avgDropVertical = verticalCablePerEntrance / 2;
         const avgDropLength = avgDropVertical + averageDistanceToApt;
-        horizontalCable = totalSubscribers * avgDropLength; // Общая длина UTP кабеля
+        horizontalCable = totalSubscribers * avgDropLength; 
     } else if (technology === 'FTTH') {
-        // FTTH: Оптика идет до квартиры.
-        // Магистральный кабель до сплиттеров в доме.
-        distributionCable = entrances * corridorLength + totalVerticalCable; // Оптика по стоякам до этажных сплиттеров
-        horizontalCable = totalSubscribers * averageDistanceToApt; // Дроп-кабель от этажной коробки до квартиры
+        distributionCable = entrances * corridorLength + totalVerticalCable; 
+        horizontalCable = totalSubscribers * averageDistanceToApt; 
     }
 
     const totalCableLength = trunkCable + distributionCable + horizontalCable;
 
-    // --- 2. Специфика технологий ---
     let splittersData = null;
     let opticalBudget = null;
 
     if (technology === 'FTTH') {
         splittersData = calculateSplitters(totalSubscribers, entrances, floors);
-        
-        // Расчет затухания для самой дальней точки
         const maxDistanceKm = (trunkCable + corridorLength * entrances + floors * floorHeight + corridorLength) / 1000;
-        // Примерно: 4 коннектора (на кроссе АТС, на входе в дом, на сплиттерах, у абонента), 4 сварки
         opticalBudget = calculateOpticalBudget(maxDistanceKm, splittersData.l1Ratio, splittersData.l2Ratio, 4, 4);
     }
 
-    // --- 3. Смета (метраж кабеля) ---
-    const calculateEstimate = (cableDist) => {
-        return {
-            trunk: Math.ceil(trunkCable),
-            distribution: Math.ceil(distributionCable),
-            horizontal: Math.ceil(horizontalCable),
-            total: Math.ceil(cableDist)
-        };
-    };
+    const calculateEstimate = (cableDist) => ({
+        trunk: Math.ceil(trunkCable),
+        distribution: Math.ceil(distributionCable),
+        horizontal: Math.ceil(horizontalCable),
+        total: Math.ceil(cableDist)
+    });
 
     const pureEstimate = calculateEstimate(totalCableLength);
-    
-    // Расчет с 15% запасом (коэффициент 1.15)
     const reserveEstimate = {
         trunk: Math.ceil(pureEstimate.trunk * 1.15),
         distribution: Math.ceil(pureEstimate.distribution * 1.15),
@@ -202,7 +201,147 @@ app.post('/calculate', (req, res) => {
         total: Math.ceil(pureEstimate.total * 1.15)
     };
 
-    // --- 4. Формирование ответа ---
+    // Расчет сметы
+    const materials = [];
+
+    materials.push({
+        name: 'Магистральный оптический кабель',
+        qty: reserveEstimate.trunk,
+        unit: 'м',
+        price: prices.cableTrunkOptic,
+        total: reserveEstimate.trunk * prices.cableTrunkOptic
+    });
+
+    if (technology === 'FTTB') {
+        materials.push({
+            name: 'Распределительный оптический кабель',
+            qty: reserveEstimate.distribution,
+            unit: 'м',
+            price: prices.cableDistOptic,
+            total: reserveEstimate.distribution * prices.cableDistOptic
+        });
+        materials.push({
+            name: 'Абонентский кабель UTP (Витая пара)',
+            qty: reserveEstimate.horizontal,
+            unit: 'м',
+            price: prices.cableUtp,
+            total: reserveEstimate.horizontal * prices.cableUtp
+        });
+        
+        materials.push({
+            name: 'Агрегационный коммутатор (на дом)',
+            qty: 1,
+            unit: 'шт',
+            price: prices.switchAggr,
+            total: prices.switchAggr
+        });
+        const accessSwitches = Math.ceil(totalSubscribers / 24);
+        materials.push({
+            name: 'Коммутатор доступа (24 порта)',
+            qty: accessSwitches,
+            unit: 'шт',
+            price: prices.switchAccess,
+            total: accessSwitches * prices.switchAccess
+        });
+        const rj45Count = totalSubscribers * 2;
+        materials.push({
+            name: 'Коннекторы RJ-45',
+            qty: rj45Count,
+            unit: 'шт',
+            price: prices.connectorRj45,
+            total: rj45Count * prices.connectorRj45
+        });
+        
+        materials.push({
+            name: 'Оптическая муфта (главный узел)',
+            qty: 1,
+            unit: 'шт',
+            price: prices.spliceBox,
+            total: prices.spliceBox
+        });
+        
+        const splicesCount = entrances * 2 + 4; 
+        materials.push({
+            name: 'Сварка оптических волокон',
+            qty: splicesCount,
+            unit: 'шт',
+            price: prices.spliceWork,
+            total: splicesCount * prices.spliceWork
+        });
+        
+    } else if (technology === 'FTTH') {
+        materials.push({
+            name: 'Распределительный оптический кабель (стояки)',
+            qty: reserveEstimate.distribution,
+            unit: 'м',
+            price: prices.cableDistOptic,
+            total: reserveEstimate.distribution * prices.cableDistOptic
+        });
+        materials.push({
+            name: 'Абонентский дроп-кабель (оптика)',
+            qty: reserveEstimate.horizontal,
+            unit: 'м',
+            price: prices.cableDropOptic,
+            total: reserveEstimate.horizontal * prices.cableDropOptic
+        });
+
+        materials.push({
+            name: 'Оптическая муфта (главный узел)',
+            qty: 1,
+            unit: 'шт',
+            price: prices.spliceBox,
+            total: prices.spliceBox
+        });
+
+        const l1Count = splittersData.counts[splittersData.l1Ratio];
+        const l1Price = prices.splitters[splittersData.l1Ratio] || 5000;
+        materials.push({
+            name: `Сплиттер магистральный 1x${splittersData.l1Ratio}`,
+            qty: l1Count,
+            unit: 'шт',
+            price: l1Price,
+            total: l1Count * l1Price
+        });
+
+        const l2Count = splittersData.counts[splittersData.l2Ratio];
+        const l2Price = prices.splitters[splittersData.l2Ratio] || 1000;
+        materials.push({
+            name: `Сплиттер этажный 1x${splittersData.l2Ratio}`,
+            qty: l2Count,
+            unit: 'шт',
+            price: l2Price,
+            total: l2Count * l2Price
+        });
+
+        materials.push({
+            name: 'Этажная распределительная коробка',
+            qty: l2Count, 
+            unit: 'шт',
+            price: prices.floorBox,
+            total: l2Count * prices.floorBox
+        });
+
+        const fastConnCount = totalSubscribers * 2;
+        materials.push({
+            name: 'Оптические Fast-коннекторы',
+            qty: fastConnCount,
+            unit: 'шт',
+            price: prices.connectorFast,
+            total: fastConnCount * prices.connectorFast
+        });
+        
+        const splicesCount = l1Count * 2 + l2Count * 2 + 4; 
+        materials.push({
+            name: 'Сварка оптических волокон',
+            qty: splicesCount,
+            unit: 'шт',
+            price: prices.spliceWork,
+            total: splicesCount * prices.spliceWork
+        });
+    }
+
+    const totalCost = materials.reduce((sum, m) => sum + m.total, 0);
+
     res.json({
         building: {
             totalSubscribers,
@@ -212,6 +351,10 @@ app.post('/calculate', (req, res) => {
         estimates: {
             pure: pureEstimate,
             withReserve: reserveEstimate
+        },
+        finance: {
+            items: materials,
+            total: totalCost
         },
         ftthDetails: technology === 'FTTH' ? {
             splitters: splittersData,

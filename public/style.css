@@ -301,3 +301,43 @@ canvas {
         grid-template-columns: 1fr;
     }
 }
+
+.table-responsive {
+    overflow-x: auto;
+    background: #fff;
+    border-radius: var(--radius);
+    border: 1px solid var(--border-color);
+}
+
+.finance-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+.finance-table th, .finance-table td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.finance-table th {
+    background-color: #f8fafc;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.finance-table tr:last-child td {
+    border-bottom: none;
+}
+
+.finance-table tr:hover {
+    background-color: #f1f5f9;
+}
+
+.finance-table td:nth-child(2),
+.finance-table td:nth-child(4),
+.finance-table td:nth-child(5) {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}

@@ -33,8 +33,11 @@
                 <div class="form-group">
                     <label for="series">Серия здания:</label>
                     <select id="series" name="series">
-                        <option value="p44">П-44/П-44Т (17 эт, 4 под)</option>
-                        <option value="khrushchev">Хрущевка 1-510 (5 эт, 4 под)</option>
+                        <option value="pik">Современный монолит (типа ПИК)</option>
+                        <option value="p44" selected>П-44/П-44Т (17 эт, 4 под)</option>
+                        <option value="i155">И-155 (Башня 24 эт)</option>
+                        <option value="brezhnevka">Брежневка (II-49, 9 эт)</option>
+                        <option value="khrushchev">Хрущевка 1-510/1-515 (5 эт)</option>
                         <option value="stalin">Сталинка (5 эт, 3 под, высокие потолки)</option>
                         <option value="custom">Пользовательские параметры...</option>
                     </select>
@@ -79,6 +82,7 @@
         <main class="panel results-panel">
             <div class="tabs">
                 <button class="tab-btn active" data-tab="summary">Сводка и Смета</button>
+                <button class="tab-btn" data-tab="finance">Финансы (Прайс)</button>
                 <button class="tab-btn" data-tab="visual">Схема здания (Canvas)</button>
             </div>
 
@@ -122,7 +126,30 @@
                 </div>
             </div>
 
-            <!-- Вкладка 2: Визуализация -->
+            <!-- Вкладка 2: Финансы -->
+            <div id="finance" class="tab-content">
+                <div class="finance-summary">
+                    <h3>Общая стоимость материалов: <span id="res-total-cost" class="highlight">0 ₽</span></h3>
+                    <p>Средняя стоимость на абонента: <strong id="res-cost-per-sub">0 ₽</strong></p>
+                </div>
+                <div class="table-container">
+                    <table class="finance-table">
+                        <thead>
+                            <tr>
+                                <th>Наименование</th>
+                                <th>Кол-во</th>
+                                <th>Ед.</th>
+                                <th>Цена (₽)</th>
+                                <th>Сумма (₽)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="finance-tbody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Вкладка 3: Визуализация -->
             <div id="visual" class="tab-content">
                 <div class="canvas-wrapper">
                     <canvas id="buildingCanvas" width="800" height="600"></canvas>

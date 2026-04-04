@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            const response = await fetch('/calculate', {
+            const response = await fetch('http://localhost:3000/calculate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -98,13 +98,34 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('est-res-dist').textContent = data.estimates.withReserve.distribution;
         document.getElementById('est-res-horiz').textContent = data.estimates.withReserve.horizontal;
         document.getElementById('est-res-total').textContent = data.estimates.withReserve.total;
+
+        // Финансы
+        if (data.finance) {
+            document.getElementById('res-total-cost').textContent = data.finance.total.toLocaleString('ru-RU') + ' ₽';
+            const costPerSub = Math.round(data.finance.total / data.building.totalSubscribers);
+            document.getElementById('res-cost-per-sub').textContent = costPerSub.toLocaleString('ru-RU') + ' ₽';
+            
+            const tbody = document.getElementById('finance-tbody');
+            tbody.innerHTML = '';
+            data.finance.items.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${item.name}</td>
+                    <td>${item.qty}</td>
+                    <td>${item.unit}</td>
+                    <td>${item.price.toLocaleString('ru-RU')}</td>
+                    <td style="font-weight: bold;">${item.total.toLocaleString('ru-RU')}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
     }
 
     // Визуализация на Canvas
     function drawBuildingCanvas(data) {
         const canvas = document.getElementById('buildingCanvas');
         const ctx = canvas.getContext('2d');
-        const { floors, entrances, routingType } = data.building;
+        const { floors, entrances, routingType, aptsPerFloor } = data.building;
         const tech = data.technology;
 
         // Очистка
@@ -131,7 +152,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Размеры секций
         const entWidth = bWidth / entrances;
-        const floorHeightPx = bHeight / floors;
+        const totalLevels = floors + 2; // +1 чердак (тех этаж), +1 подвал
+        const floorHeightPx = bHeight / totalLevels;
 
         // 1. Отрисовка контура здания
         ctx.strokeStyle = colors.building;
@@ -140,7 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Сетка этажей и подъездов
         ctx.beginPath();
-        for (let i = 1; i < floors; i++) {
+        for (let i = 1; i < totalLevels; i++) {
             ctx.moveTo(marginX, marginY + i * floorHeightPx);
             ctx.lineTo(marginX + bWidth, marginY + i * floorHeightPx);
         }
@@ -150,8 +172,45 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         ctx.stroke();
 
+        // Обозначения этажей
+        ctx.fillStyle = '#1e293b';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        
+        for (let r = 0; r < totalLevels; r++) {
+            const yCenter = marginY + r * floorHeightPx + floorHeightPx / 2;
+            let text = '';
+            if (r === 0) text = 'Чердак';
+            else if (r === totalLevels - 1) text = 'Подвал';
+            else text = `Этаж ${floors - r + 1}`;
+            
+            ctx.fillText(text, marginX - 10, yCenter);
+        }
+
+        // Обозначения номеров квартир
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#64748b';
+        ctx.font = '11px Arial';
+        
+        let currentApt = 1;
+        for (let e = 0; e < entrances; e++) {
+            for (let f = 1; f <= floors; f++) {
+                const r = floors - f + 1;
+                const cellXCenter = marginX + e * entWidth + entWidth / 2;
+                const cellYCenter = marginY + r * floorHeightPx + floorHeightPx / 2;
+                
+                const startApt = currentApt;
+                const endApt = currentApt + aptsPerFloor - 1;
+                ctx.fillText(`кв ${startApt}-${endApt}`, cellXCenter, cellYCenter - Math.min(15, floorHeightPx * 0.3));
+                
+                currentApt += aptsPerFloor;
+            }
+        }
+        ctx.textAlign = 'left'; // Сброс выравнивания
+
         // 2. Линия от АТС
-        const atsY = marginY + bHeight - 20; // Ввод в подвал
+        const atsY = marginY + bHeight - floorHeightPx / 2; // Ввод в подвал
         ctx.beginPath();
         ctx.strokeStyle = colors.ats;
         ctx.lineWidth = 3;
@@ -166,7 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 3. Главный узел в здании (в подвале первого подъезда)
         const mainNodeX = marginX + entWidth / 2;
-        const mainNodeY = marginY + bHeight - 15;
+        const mainNodeY = marginY + bHeight - floorHeightPx / 2;
         
         ctx.beginPath();
         ctx.arc(mainNodeX, mainNodeY, 8, 0, Math.PI * 2);
@@ -191,17 +250,17 @@ document.addEventListener('DOMContentLoaded', () => {
             // Стояк идет вверх
             ctx.moveTo(entCenter, mainNodeY);
             
-            // Если внешняя прокладка, рисуем линию снаружи и заводим
+            // Если внешняя прокладка, рисуем линию до чердака (r=0)
             if (routingType === 'external') {
-                ctx.lineTo(entCenter, marginY - 10); // На крышу
+                ctx.lineTo(entCenter, marginY + floorHeightPx / 2); 
             } else {
-                ctx.lineTo(entCenter, marginY + floorHeightPx / 2); // До верхнего этажа
+                ctx.lineTo(entCenter, marginY + floorHeightPx * 1.5); // До верхнего жилого этажа (r=1)
             }
 
-            // Отмечаем точки для этажных коробок (например, на каждом 2 этаже или на каждом)
-            // Для упрощения визуализации ставим коробку на каждом этаже
-            for (let f = 0; f < floors; f++) {
-                const floorCenterY = marginY + f * floorHeightPx + floorHeightPx / 2;
+            // Отмечаем точки для этажных коробок (только на жилых этажах)
+            for (let f = 1; f <= floors; f++) {
+                const r = floors - f + 1;
+                const floorCenterY = marginY + r * floorHeightPx + floorHeightPx / 2;
                 floorNodesCoords.push({ x: entCenter, y: floorCenterY });
             }
         }
@@ -228,7 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Добавим пояснительный текст
         ctx.fillStyle = '#1e293b';
         ctx.font = '14px Arial';
-        ctx.fillText(`Схема здания: ${entrances} подъездов, ${floors} этажей`, marginX, marginY - 20);
+        ctx.fillText(`Схема здания: ${entrances} подъездов, ${floors} жилых этажей`, marginX, marginY - 20);
     }
 
     // Инициализация расчета по умолчанию при загрузке
