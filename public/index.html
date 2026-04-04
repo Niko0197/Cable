@@ -40,13 +40,18 @@
                     <label for="series">Серия здания:</label>
                     <select id="series" name="series">
                         <option value="pik">Современный монолит (типа ПИК)</option>
-                        <option value="p44" selected>П-44/П-44Т (17 эт, 4 под)</option>
+                        <option value="p44" selected>П-44/П-44Т (17 эт)</option>
                         <option value="i155">И-155 (Башня 24 эт)</option>
                         <option value="brezhnevka">Брежневка (II-49, 9 эт)</option>
                         <option value="khrushchev">Хрущевка 1-510/1-515 (5 эт)</option>
-                        <option value="stalin">Сталинка (5 эт, 3 под, высокие потолки)</option>
+                        <option value="stalin">Сталинка (5 эт, высокие потолки)</option>
                         <option value="custom">Пользовательские параметры...</option>
                     </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="entrances">Кол-во подъездов:</label>
+                    <input type="number" id="entrances" name="entrances" value="4" min="1" required>
                 </div>
 
                 <div id="custom-params" class="hidden">
@@ -54,10 +59,6 @@
                     <div class="form-group">
                         <label for="floors">Этажность:</label>
                         <input type="number" id="floors" name="floors" value="9" min="1">
-                    </div>
-                    <div class="form-group">
-                        <label for="entrances">Кол-во подъездов:</label>
-                        <input type="number" id="entrances" name="entrances" value="4" min="1">
                     </div>
                     <div class="form-group">
                         <label for="aptsPerFloor">Квартир на этаже:</label>
@@ -171,6 +172,6 @@
         </main>
     </div>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=2"></script>
 </body>
 </html>

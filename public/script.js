@@ -32,9 +32,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     toggleSwitch.addEventListener('change', switchTheme, false);
 
-    // Переключение пользовательских параметров
+    const seriesEntrances = {
+        'pik': 1,
+        'p44': 4,
+        'i155': 1,
+        'brezhnevka': 4,
+        'khrushchev': 4,
+        'stalin': 3
+    };
+
+    // Переключение пользовательских параметров и автоподстановка подъездов
     seriesSelect.addEventListener('change', (e) => {
-        if (e.target.value === 'custom') {
+        const selectedSeries = e.target.value;
+        
+        // Автоподстановка подъездов для выбранной серии
+        if (seriesEntrances[selectedSeries]) {
+            document.getElementById('entrances').value = seriesEntrances[selectedSeries];
+        }
+
+        if (selectedSeries === 'custom') {
             customParamsDiv.classList.remove('hidden');
         } else {
             customParamsDiv.classList.add('hidden');
@@ -63,12 +79,12 @@ document.addEventListener('DOMContentLoaded', () => {
             series: series,
             technology: formData.get('technology'),
             distanceAts: formData.get('distanceAts'),
+            entrances: parseInt(formData.get('entrances'), 10) || 1
         };
 
         if (series === 'custom') {
             payload.customParams = {
                 floors: parseInt(formData.get('floors')),
-                entrances: parseInt(formData.get('entrances')),
                 aptsPerFloor: parseInt(formData.get('aptsPerFloor')),
                 floorHeight: parseFloat(formData.get('floorHeight')),
                 corridorLength: parseFloat(formData.get('corridorLength')),

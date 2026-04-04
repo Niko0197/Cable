@@ -30,7 +30,7 @@ const buildingSeries = {
         routingType: 'internal'
     },
     'p44': {
-        name: 'П-44/П-44Т (17 эт, 4 под)',
+        name: 'П-44/П-44Т (17 эт)',
         floors: 17,
         entrances: 4,
         aptsPerFloor: 4,
@@ -66,7 +66,7 @@ const buildingSeries = {
         routingType: 'external'
     },
     'stalin': {
-        name: 'Сталинка',
+        name: 'Сталинка (5 эт)',
         floors: 5,
         entrances: 3,
         aptsPerFloor: 3,
@@ -147,11 +147,16 @@ function calculateOpticalBudget(totalDistanceKm, l1Ratio, l2Ratio, splicesCount,
 }
 
 app.post('/calculate', (req, res) => {
-    const { series, technology, distanceAts, customParams } = req.body;
+    const { series, technology, distanceAts, customParams, entrances: reqEntrances } = req.body;
 
-    let bParams = series === 'custom' ? customParams : buildingSeries[series];
+    let bParams = series === 'custom' ? { ...customParams } : { ...buildingSeries[series] };
     if (!bParams) {
         return res.status(400).json({ error: 'Неверные параметры здания' });
+    }
+
+    // Приоритет количеству подъездов из запроса
+    if (reqEntrances !== undefined && reqEntrances !== null && !isNaN(reqEntrances) && reqEntrances > 0) {
+        bParams.entrances = Number(reqEntrances);
     }
 
     const { floors, entrances, aptsPerFloor, floorHeight, corridorLength, routingType } = bParams;
