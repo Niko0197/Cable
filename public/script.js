@@ -5,6 +5,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const tabs = document.querySelectorAll('.tab-btn');
     const tabContents = document.querySelectorAll('.tab-content');
 
+    // Тема
+    const toggleSwitch = document.querySelector('.theme-switch input[type="checkbox"]');
+    const currentTheme = localStorage.getItem('theme');
+
+    if (currentTheme) {
+        document.documentElement.setAttribute('data-theme', currentTheme);
+        if (currentTheme === 'dark') {
+            toggleSwitch.checked = true;
+        }
+    }
+
+    function switchTheme(e) {
+        if (e.target.checked) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            localStorage.setItem('theme', 'dark');
+        } else {
+            document.documentElement.setAttribute('data-theme', 'light');
+            localStorage.setItem('theme', 'light');
+        }
+        // Перерисовываем канвас при смене темы
+        if (window.lastCalculationData) {
+            drawBuildingCanvas(window.lastCalculationData);
+        }
+    }
+
+    toggleSwitch.addEventListener('change', switchTheme, false);
+
     // Переключение пользовательских параметров
     seriesSelect.addEventListener('change', (e) => {
         if (e.target.value === 'custom') {
@@ -58,6 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const data = await response.json();
             if (response.ok) {
+                window.lastCalculationData = data;
                 updateUI(data);
                 drawBuildingCanvas(data);
             } else {
@@ -88,37 +116,98 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Чистая смета
-        document.getElementById('est-pure-trunk').textContent = data.estimates.pure.trunk;
-        document.getElementById('est-pure-dist').textContent = data.estimates.pure.distribution;
-        document.getElementById('est-pure-horiz').textContent = data.estimates.pure.horizontal;
-        document.getElementById('est-pure-total').textContent = data.estimates.pure.total;
-
+        document.getElementById('est-pure-trunk').value = data.estimates.pure.trunk;
+        document.getElementById('est-pure-dist').value = data.estimates.pure.distribution;
+        document.getElementById('est-pure-horiz').value = data.estimates.pure.horizontal;
+        
         // Смета с запасом
-        document.getElementById('est-res-trunk').textContent = data.estimates.withReserve.trunk;
-        document.getElementById('est-res-dist').textContent = data.estimates.withReserve.distribution;
-        document.getElementById('est-res-horiz').textContent = data.estimates.withReserve.horizontal;
-        document.getElementById('est-res-total').textContent = data.estimates.withReserve.total;
+        document.getElementById('est-res-trunk').value = data.estimates.withReserve.trunk;
+        document.getElementById('est-res-dist').value = data.estimates.withReserve.distribution;
+        document.getElementById('est-res-horiz').value = data.estimates.withReserve.horizontal;
+
+        recalculateEstimateTotals();
 
         // Финансы
         if (data.finance) {
-            document.getElementById('res-total-cost').textContent = data.finance.total.toLocaleString('ru-RU') + ' ₽';
-            const costPerSub = Math.round(data.finance.total / data.building.totalSubscribers);
-            document.getElementById('res-cost-per-sub').textContent = costPerSub.toLocaleString('ru-RU') + ' ₽';
-            
-            const tbody = document.getElementById('finance-tbody');
-            tbody.innerHTML = '';
-            data.finance.items.forEach(item => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${item.name}</td>
-                    <td>${item.qty}</td>
-                    <td>${item.unit}</td>
-                    <td>${item.price.toLocaleString('ru-RU')}</td>
-                    <td style="font-weight: bold;">${item.total.toLocaleString('ru-RU')}</td>
-                `;
-                tbody.appendChild(tr);
-            });
+            renderFinanceTable(data.finance.items);
         }
+    }
+
+    function renderFinanceTable(items) {
+        const tbody = document.getElementById('finance-tbody');
+        tbody.innerHTML = '';
+        items.forEach((item, index) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${item.name}</td>
+                <td><input type="number" class="finance-input edit-qty" data-index="${index}" value="${item.qty}"></td>
+                <td>${item.unit}</td>
+                <td><input type="number" class="finance-input edit-price" data-index="${index}" value="${item.price}"></td>
+                <td style="font-weight: bold;" class="item-total">${item.total.toLocaleString('ru-RU')}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+        updateFinanceTotals();
+    }
+
+    // Слушатели для ручного редактирования сметы
+    const resInputs = document.querySelectorAll('.res-input');
+    resInputs.forEach(input => {
+        input.addEventListener('input', () => {
+            if (input.value === '' && window.lastCalculationData) {
+                // Восстанавливаем из исходных данных если пусто
+                const id = input.id;
+                const path = id.startsWith('est-pure') ? 'pure' : 'withReserve';
+                const field = id.split('-').pop();
+                const keyMap = { trunk: 'trunk', dist: 'distribution', horiz: 'horizontal' };
+                input.value = window.lastCalculationData.estimates[path][keyMap[field]];
+            }
+            recalculateEstimateTotals();
+        });
+    });
+
+    function recalculateEstimateTotals() {
+        const pureTotal = 
+            parseFloat(document.getElementById('est-pure-trunk').value || 0) +
+            parseFloat(document.getElementById('est-pure-dist').value || 0) +
+            parseFloat(document.getElementById('est-pure-horiz').value || 0);
+        
+        const resTotal = 
+            parseFloat(document.getElementById('est-res-trunk').value || 0) +
+            parseFloat(document.getElementById('est-res-dist').value || 0) +
+            parseFloat(document.getElementById('est-res-horiz').value || 0);
+
+        document.getElementById('est-pure-total').textContent = Math.round(pureTotal * 10) / 10 + ' м';
+        document.getElementById('est-res-total').textContent = Math.round(resTotal * 10) / 10 + ' м';
+    }
+
+    // Слушатели для таблицы финансов
+    document.getElementById('finance-tbody').addEventListener('input', (e) => {
+        if (e.target.classList.contains('edit-qty') || e.target.classList.contains('edit-price')) {
+            const tr = e.target.closest('tr');
+            const qty = parseFloat(tr.querySelector('.edit-qty').value || 0);
+            const price = parseFloat(tr.querySelector('.edit-price').value || 0);
+            const totalCell = tr.querySelector('.item-total');
+            
+            const total = qty * price;
+            totalCell.textContent = total.toLocaleString('ru-RU');
+            
+            updateFinanceTotals();
+        }
+    });
+
+    function updateFinanceTotals() {
+        let totalSum = 0;
+        document.querySelectorAll('.item-total').forEach(cell => {
+            const val = parseFloat(cell.textContent.replace(/\s/g, '').replace(',', '.')) || 0;
+            totalSum += val;
+        });
+
+        document.getElementById('res-total-cost').textContent = totalSum.toLocaleString('ru-RU') + ' ₽';
+        
+        const totalSubs = parseInt(document.getElementById('res-total-subs').textContent) || 1;
+        const costPerSub = Math.round(totalSum / totalSubs);
+        document.getElementById('res-cost-per-sub').textContent = costPerSub.toLocaleString('ru-RU') + ' ₽';
     }
 
     // Визуализация на Canvas
@@ -127,11 +216,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const ctx = canvas.getContext('2d');
         const { floors, entrances, routingType, aptsPerFloor } = data.building;
         const tech = data.technology;
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
         // Очистка
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Цвета линий в зависимости от технологии
+        // Цвета линий в зависимости от технологии и темы
         const colors = {
             ats: '#ef4444',     // Красный (от АТС)
             distFTTH: '#f97316', // Оранжевый (Оптика)
@@ -139,7 +229,9 @@ document.addEventListener('DOMContentLoaded', () => {
             horiz: '#10b981',    // Зеленый (UTP/Дроп)
             mainNode: '#8b5cf6', // Фиолетовый (Муфта/Коммутатор)
             floorNode: '#f59e0b',// Желтый (Этажная коробка)
-            building: '#cbd5e1'  // Серый
+            building: isDark ? '#475569' : '#cbd5e1', // Контур здания
+            textMain: isDark ? '#f8fafc' : '#1e293b',
+            textMuted: isDark ? '#94a3b8' : '#64748b'
         };
 
         const distColor = tech === 'FTTH' ? colors.distFTTH : colors.distFTTB;
@@ -173,7 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.stroke();
 
         // Обозначения этажей
-        ctx.fillStyle = '#1e293b';
+        ctx.fillStyle = colors.textMain;
         ctx.font = '12px Arial';
         ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
@@ -190,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Обозначения номеров квартир
         ctx.textAlign = 'center';
-        ctx.fillStyle = '#64748b';
+        ctx.fillStyle = colors.textMuted;
         ctx.font = '11px Arial';
         
         let currentApt = 1;
@@ -285,7 +377,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Добавим пояснительный текст
-        ctx.fillStyle = '#1e293b';
+        ctx.fillStyle = colors.textMain;
         ctx.font = '14px Arial';
         ctx.fillText(`Схема здания: ${entrances} подъездов, ${floors} жилых этажей`, marginX, marginY - 20);
     }

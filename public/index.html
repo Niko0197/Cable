@@ -7,6 +7,12 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div class="theme-switch-wrapper">
+        <label class="theme-switch" for="checkbox">
+            <input type="checkbox" id="checkbox" />
+            <div class="slider round"></div>
+        </label>
+    </div>
     <header>
         <h1>Интерактивный симулятор сетей FTTB & FTTH</h1>
         <p>Калькулятор сметы и визуализатор архитектуры жилых зданий</p>
@@ -106,21 +112,21 @@
 
                 <div class="estimates">
                     <div class="estimate-box pure">
-                        <h3>Чистый расчет кабеля</h3>
+                        <h3>Чистый расчет кабеля (м)</h3>
                         <ul>
-                            <li>Магистраль (до здания): <span id="est-pure-trunk">-</span> м</li>
-                            <li>Распределительная: <span id="est-pure-dist">-</span> м</li>
-                            <li>Горизонтальная (до кв): <span id="est-pure-horiz">-</span> м</li>
-                            <li class="total">Итого: <span id="est-pure-total">-</span> м</li>
+                            <li>Магистраль: <input type="number" id="est-pure-trunk" class="res-input"></li>
+                            <li>Распределительная: <input type="number" id="est-pure-dist" class="res-input"></li>
+                            <li>Горизонтальная: <input type="number" id="est-pure-horiz" class="res-input"></li>
+                            <li class="total">Итого: <span id="est-pure-total">-</span></li>
                         </ul>
                     </div>
                     <div class="estimate-box reserve">
-                        <h3>Смета (Запас 15%)</h3>
+                        <h3>Смета с запасом 15% (м)</h3>
                         <ul>
-                            <li>Магистраль (до здания): <span id="est-res-trunk">-</span> м</li>
-                            <li>Распределительная: <span id="est-res-dist">-</span> м</li>
-                            <li>Горизонтальная (до кв): <span id="est-res-horiz">-</span> м</li>
-                            <li class="total">Итого: <span id="est-res-total">-</span> м</li>
+                            <li>Магистраль: <input type="number" id="est-res-trunk" class="res-input"></li>
+                            <li>Распределительная: <input type="number" id="est-res-dist" class="res-input"></li>
+                            <li>Горизонтальная: <input type="number" id="est-res-horiz" class="res-input"></li>
+                            <li class="total">Итого: <span id="est-res-total">-</span></li>
                         </ul>
                     </div>
                 </div>
