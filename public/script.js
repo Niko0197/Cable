@@ -93,7 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            const response = await fetch('http://localhost:3000/calculate', {
+            const response = await fetch('/calculate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -237,30 +237,26 @@ document.addEventListener('DOMContentLoaded', () => {
         // Очистка
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Цвета линий в зависимости от технологии и темы
+        // Цвета линий для FTTB
         const colors = {
-            ats: '#ef4444',     // Красный (от АТС)
-            distFTTH: '#f97316', // Оранжевый (Оптика)
-            distFTTB: '#3b82f6', // Синий (Оптика до подвала, далее медь)
-            horiz: '#10b981',    // Зеленый (UTP/Дроп)
-            mainNode: '#8b5cf6', // Фиолетовый (Муфта/Коммутатор)
-            floorNode: '#f59e0b',// Желтый (Этажная коробка)
-            building: isDark ? '#475569' : '#cbd5e1', // Контур здания
+            okr: '#ef4444',      // Красный (Оптика до здания)
+            rsh: '#8b5cf6',      // Фиолетовый (Шкаф - переход на медь)
+            copper: '#3b82f6',   // Синий (Медный стояк/магистраль по дому)
+            horiz: '#10b981',    // Зеленый (Разводка до абонента)
+            kr: '#f97316',       // Оранжевый (Коробка КР)
+            kru: '#64748b',      // Серый (Коробка КРУ)
+            building: isDark ? '#475569' : '#cbd5e1', 
             textMain: isDark ? '#f8fafc' : '#1e293b',
             textMuted: isDark ? '#94a3b8' : '#64748b'
         };
 
-        const distColor = tech === 'FTTH' ? colors.distFTTH : colors.distFTTB;
-
-        // Настройки отрисовки
-        const marginX = 100; // Отступ слева для АТС
+        const marginX = 120;
         const marginY = 50;
         const bWidth = 600;
         const bHeight = 450;
         
-        // Размеры секций
         const entWidth = bWidth / entrances;
-        const totalLevels = floors + 2; // +1 чердак (тех этаж), +1 подвал
+        const totalLevels = floors + 2;
         const floorHeightPx = bHeight / totalLevels;
 
         // 1. Отрисовка контура здания
@@ -268,134 +264,168 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.lineWidth = 2;
         ctx.strokeRect(marginX, marginY, bWidth, bHeight);
         
-        // Сетка этажей и подъездов
         ctx.beginPath();
         for (let i = 1; i < totalLevels; i++) {
             ctx.moveTo(marginX, marginY + i * floorHeightPx);
             ctx.lineTo(marginX + bWidth, marginY + i * floorHeightPx);
         }
+        ctx.stroke();
+
+        ctx.beginPath();
         for (let i = 1; i < entrances; i++) {
-            ctx.moveTo(marginX + i * entWidth, marginY);
-            ctx.lineTo(marginX + i * entWidth, marginY + bHeight);
+            ctx.moveTo(marginX + i * entWidth, marginY + floorHeightPx);
+            ctx.lineTo(marginX + i * entWidth, marginY + bHeight - floorHeightPx);
         }
         ctx.stroke();
 
-        // Обозначения этажей
+        // Подписи этажей
         ctx.fillStyle = colors.textMain;
         ctx.font = '12px Arial';
         ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
-        
         for (let r = 0; r < totalLevels; r++) {
             const yCenter = marginY + r * floorHeightPx + floorHeightPx / 2;
-            let text = '';
-            if (r === 0) text = 'Чердак';
-            else if (r === totalLevels - 1) text = 'Подвал';
-            else text = `Этаж ${floors - r + 1}`;
-            
+            let text = r === 0 ? 'Чердак' : (r === totalLevels - 1 ? 'Подвал' : `Этаж ${floors - r + 1}`);
             ctx.fillText(text, marginX - 10, yCenter);
         }
 
-        // Обозначения номеров квартир
-        ctx.textAlign = 'center';
-        ctx.fillStyle = colors.textMuted;
-        ctx.font = '11px Arial';
-        
-        let currentApt = 1;
-        for (let e = 0; e < entrances; e++) {
-            for (let f = 1; f <= floors; f++) {
-                const r = floors - f + 1;
-                const cellXCenter = marginX + e * entWidth + entWidth / 2;
-                const cellYCenter = marginY + r * floorHeightPx + floorHeightPx / 2;
-                
-                const startApt = currentApt;
-                const endApt = currentApt + aptsPerFloor - 1;
-                ctx.fillText(`кв ${startApt}-${endApt}`, cellXCenter, cellYCenter - Math.min(15, floorHeightPx * 0.3));
-                
-                currentApt += aptsPerFloor;
-            }
-        }
-        ctx.textAlign = 'left'; // Сброс выравнивания
+        const basementY = marginY + bHeight - floorHeightPx / 2;
+        const rshX = marginX + 35;
 
-        // 2. Линия от АТС
-        const atsY = marginY + bHeight - floorHeightPx / 2; // Ввод в подвал
+        // 2. ОКР и РШ
         ctx.beginPath();
-        ctx.strokeStyle = colors.ats;
+        ctx.strokeStyle = colors.okr;
         ctx.lineWidth = 3;
-        ctx.moveTo(10, atsY);
-        ctx.lineTo(marginX, atsY);
+        ctx.moveTo(10, basementY);
+        ctx.lineTo(marginX + 25, basementY);
         ctx.stroke();
         
-        // Подпись АТС
-        ctx.fillStyle = colors.ats;
-        ctx.font = '12px Arial';
-        ctx.fillText('АТС', 10, atsY - 10);
+        ctx.fillStyle = colors.okr;
+        ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText('ОКР (Оптика)', 10, basementY - 10);
 
-        // 3. Главный узел в здании (в подвале первого подъезда)
-        const mainNodeX = marginX + entWidth / 2;
-        const mainNodeY = marginY + bHeight - floorHeightPx / 2;
-        
-        ctx.beginPath();
-        ctx.arc(mainNodeX, mainNodeY, 8, 0, Math.PI * 2);
-        ctx.fillStyle = colors.mainNode;
-        ctx.fill();
+        ctx.fillStyle = colors.rsh;
+        ctx.fillRect(rshX - 10, basementY - 10, 20, 20);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 9px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('РШ', rshX, basementY + 4);
 
-        // 4. Трассировка распределительной сети (стояки)
+        // 3. Медная магистраль и стояки
         ctx.beginPath();
-        ctx.strokeStyle = distColor;
+        ctx.strokeStyle = colors.copper;
         ctx.lineWidth = 2;
-        
-        // Линия по подвалу ко всем подъездам
-        ctx.moveTo(mainNodeX, mainNodeY);
-        ctx.lineTo(marginX + bWidth - entWidth / 2, mainNodeY);
-        
-        // Вертикальные стояки в каждом подъезде
-        const floorNodesCoords = [];
-        
-        for (let e = 0; e < entrances; e++) {
-            const entCenter = marginX + e * entWidth + entWidth / 2;
-            
-            // Стояк идет вверх
-            ctx.moveTo(entCenter, mainNodeY);
-            
-            // Если внешняя прокладка, рисуем линию до чердака (r=0)
-            if (routingType === 'external') {
-                ctx.lineTo(entCenter, marginY + floorHeightPx / 2); 
-            } else {
-                ctx.lineTo(entCenter, marginY + floorHeightPx * 1.5); // До верхнего жилого этажа (r=1)
-            }
-
-            // Отмечаем точки для этажных коробок (только на жилых этажах)
-            for (let f = 1; f <= floors; f++) {
-                const r = floors - f + 1;
-                const floorCenterY = marginY + r * floorHeightPx + floorHeightPx / 2;
-                floorNodesCoords.push({ x: entCenter, y: floorCenterY });
-            }
-        }
+        ctx.moveTo(rshX, basementY);
+        ctx.lineTo(marginX + bWidth - entWidth / 2, basementY);
         ctx.stroke();
 
-        // 5. Отрисовка этажных узлов и горизонтальной разводки
-        floorNodesCoords.forEach(node => {
-            // Рисуем отводы к квартирам (горизонталь)
+        let globalAptCounter = 1;
+        for (let e = 0; e < entrances; e++) {
+            const riserX = marginX + e * entWidth + entWidth / 2;
+            
+            // Отрисовка стояка (вертикаль)
             ctx.beginPath();
-            ctx.strokeStyle = colors.horiz;
-            ctx.lineWidth = 1.5;
-            // Влево и вправо от стояка
-            ctx.moveTo(node.x, node.y);
-            ctx.lineTo(node.x - entWidth / 3, node.y);
-            ctx.moveTo(node.x, node.y);
-            ctx.lineTo(node.x + entWidth / 3, node.y);
+            ctx.strokeStyle = colors.copper;
+            ctx.lineWidth = 2;
+            ctx.moveTo(riserX, basementY);
+            ctx.lineTo(riserX, marginY + floorHeightPx); 
             ctx.stroke();
 
-            // Рисуем саму коробку (сплиттер/коммутатор)
-            ctx.fillStyle = colors.floorNode;
-            ctx.fillRect(node.x - 4, node.y - 4, 8, 8);
-        });
+            // Массив для хранения координат КР для отрисовки поверх разводки
+            const krToDraw = [];
+            const kruToDraw = [];
 
-        // Добавим пояснительный текст
+            for (let f = 1; f <= floors; f++) {
+                const r = floors - f + 1;
+                const floorY = marginY + r * floorHeightPx + floorHeightPx / 2;
+                
+                // Отрисовка коробочек квартир
+                const aptSpacing = entWidth / (aptsPerFloor + 1);
+                const aptBoxes = [];
+
+                for (let a = 1; a <= aptsPerFloor; a++) {
+                    const aptX = marginX + e * entWidth + a * aptSpacing;
+                    const aptY = floorY;
+                    
+                    // Рисуем коробочку квартиры
+                    ctx.fillStyle = isDark ? '#334155' : '#f1f5f9';
+                    ctx.strokeStyle = colors.building;
+                    ctx.lineWidth = 1;
+                    ctx.fillRect(aptX - 8, aptY - 8, 16, 16);
+                    ctx.strokeRect(aptX - 8, aptY - 8, 16, 16);
+                    
+                    // Номер квартиры
+                    ctx.fillStyle = colors.textMuted;
+                    ctx.font = '8px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(globalAptCounter++, aptX, aptY + 3);
+                    
+                    aptBoxes.push({ x: aptX, y: aptY });
+                }
+
+                // Логика соединений
+                const isEven = (f % 2 === 0);
+                const isLastOdd = (f === floors && floors % 2 !== 0);
+
+                if (isEven || isLastOdd) {
+                    // КР на этом этаже
+                    krToDraw.push({ x: riserX, y: floorY });
+
+                    // Разводка к квартирам ЭТОГО этажа от КР
+                    aptBoxes.forEach(apt => {
+                        ctx.beginPath();
+                        ctx.strokeStyle = colors.horiz;
+                        ctx.lineWidth = 1;
+                        ctx.moveTo(riserX, floorY);
+                        ctx.lineTo(apt.x, apt.y);
+                        ctx.stroke();
+                    });
+
+                    // Если это четный этаж, обслуживаем и нижний через КРУ
+                    if (isEven && f > 1) {
+                        const lowerFloorY = floorY + floorHeightPx;
+                        kruToDraw.push({ x: riserX - 4, y: lowerFloorY });
+
+                        // Линия от КР вниз к КРУ
+                        ctx.beginPath();
+                        ctx.strokeStyle = colors.horiz;
+                        ctx.setLineDash([2, 2]);
+                        ctx.moveTo(riserX - 4, floorY);
+                        ctx.lineTo(riserX - 4, lowerFloorY);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+
+                        // Разводка от КРУ к квартирам нижнего этажа
+                        for (let a = 1; a <= aptsPerFloor; a++) {
+                            const lowerAptX = marginX + e * entWidth + a * aptSpacing;
+                            ctx.beginPath();
+                            ctx.strokeStyle = colors.horiz;
+                            ctx.moveTo(riserX - 4, lowerFloorY);
+                            ctx.lineTo(lowerAptX, lowerFloorY);
+                            ctx.stroke();
+                        }
+                    }
+                }
+            }
+
+            // Отрисовка самих узлов КР и КРУ поверх линий
+            kruToDraw.forEach(kru => {
+                ctx.fillStyle = colors.kru;
+                ctx.beginPath();
+                ctx.arc(kru.x, kru.y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            krToDraw.forEach(kr => {
+                ctx.fillStyle = colors.kr;
+                ctx.fillRect(kr.x - 5, kr.y - 5, 10, 10);
+            });
+        }
+
         ctx.fillStyle = colors.textMain;
-        ctx.font = '14px Arial';
-        ctx.fillText(`Схема здания: ${entrances} подъездов, ${floors} жилых этажей`, marginX, marginY - 20);
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText(`FTTB Схема: Оптика до РШ, далее медь. ${entrances} под., ${floors} эт.`, marginX, marginY - 20);
     }
 
     // Инициализация расчета по умолчанию при загрузке

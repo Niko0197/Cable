@@ -23,16 +23,10 @@
         <aside class="panel controls-panel">
             <h2>Параметры проекта</h2>
             <form id="calc-form">
+                <input type="hidden" name="technology" value="FTTB">
+                
                 <div class="form-group">
-                    <label for="technology">Технология подключения:</label>
-                    <select id="technology" name="technology">
-                        <option value="FTTH">FTTH (GPON - Оптика до квартиры)</option>
-                        <option value="FTTB">FTTB (Оптика до здания, Ethernet)</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="distanceAts">Расстояние от АТС (метры):</label>
+                    <label for="distanceAts">Расстояние от ОКР (метры):</label>
                     <input type="number" id="distanceAts" name="distanceAts" value="2500" min="100" required>
                 </div>
 
@@ -162,11 +156,12 @@
                     <canvas id="buildingCanvas" width="800" height="600"></canvas>
                 </div>
                 <div class="legend">
-                    <span class="legend-item"><span class="color-box ats"></span> Магистраль (от АТС)</span>
-                    <span class="legend-item"><span class="color-box dist"></span> Распределительная сеть</span>
-                    <span class="legend-item"><span class="color-box horiz"></span> Абонентский отвод</span>
-                    <span class="legend-item"><span class="color-box node main"></span> Главный узел (Муфта)</span>
-                    <span class="legend-item"><span class="color-box node floor"></span> Этажная коробка / Сплиттер</span>
+                    <span class="legend-item"><span class="color-box okr"></span> ОКР (Районный кабель)</span>
+                    <span class="legend-item"><span class="color-box rsh"></span> РШ (Распред. шкаф)</span>
+                    <span class="legend-item"><span class="color-box riser"></span> Стояк (Кабель-каналы)</span>
+                    <span class="legend-item"><span class="color-box kr"></span> КР (Распред. коробка)</span>
+                    <span class="legend-item"><span class="color-box kru"></span> КРУ (Протяжная коробка)</span>
+                    <span class="legend-item"><span class="color-box horiz"></span> Разводка по квартирам</span>
                 </div>
             </div>
         </main>

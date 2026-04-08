@@ -413,11 +413,12 @@ canvas {
     display: inline-block;
 }
 
-.color-box.ats { background: #ef4444; }
-.color-box.dist { background: #3b82f6; }
+.color-box.okr { background: #ef4444; }
+.color-box.riser { background: #3b82f6; }
 .color-box.horiz { background: #10b981; }
-.color-box.node.main { background: #8b5cf6; border-radius: 50%; }
-.color-box.node.floor { background: #f59e0b; }
+.color-box.rsh { background: #8b5cf6; }
+.color-box.kr { background: #f59e0b; }
+.color-box.kru { background: #64748b; border-radius: 50%; }
 
 @media (max-width: 900px) {
     .container {
