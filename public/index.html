@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FTTB/FTTH Симулятор Проектирования</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="theme-switch-wrapper">
+        <label class="theme-switch" for="checkbox">
+            <input type="checkbox" id="checkbox" />
+            <div class="slider round"></div>
+        </label>
+    </div>
+    <header>
+        <h1>Интерактивный симулятор сетей FTTB & FTTH</h1>
+        <p>Калькулятор сметы и визуализатор архитектуры жилых зданий</p>
+    </header>
+
+    <div class="container">
+        <!-- Левая панель: Ввод данных -->
+        <aside class="panel controls-panel">
+            <h2>Параметры проекта</h2>
+            <form id="calc-form">
+                <input type="hidden" name="technology" value="FTTB">
+                
+                <div class="form-group">
+                    <label for="distanceAts">Расстояние от ОКР (метры):</label>
+                    <input type="number" id="distanceAts" name="distanceAts" value="2500" min="100" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="series">Серия здания:</label>
+                    <select id="series" name="series">
+                        <option value="pik">Современный монолит (типа ПИК)</option>
+                        <option value="p44" selected>П-44/П-44Т (17 эт)</option>
+                        <option value="i155">И-155 (Башня 24 эт)</option>
+                        <option value="brezhnevka">Брежневка (II-49, 9 эт)</option>
+                        <option value="khrushchev">Хрущевка 1-510/1-515 (5 эт)</option>
+                        <option value="stalin">Сталинка (5 эт, высокие потолки)</option>
+                        <option value="custom">Пользовательские параметры...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="entrances">Кол-во подъездов:</label>
+                    <input type="number" id="entrances" name="entrances" value="4" min="1" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="floors">Этажность:</label>
+                    <input type="number" id="floors" name="floors" value="17" min="1" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="entryPoint">Ввод кабеля (ОКР):</label>
+                    <select id="entryPoint" name="entryPoint">
+                        <option value="basement" selected>Подвал</option>
+                        <option value="attic">Чердак</option>
+                    </select>
+                </div>
+
+                <div id="custom-params" class="hidden">
+                    <h3>Пользовательские параметры</h3>
+                    <div class="form-group">
+                        <label for="aptsPerFloor">Квартир на этаже:</label>
+                        <input type="number" id="aptsPerFloor" name="aptsPerFloor" value="4" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="floorHeight">Высота этажа (м):</label>
+                        <input type="number" id="floorHeight" name="floorHeight" value="2.8" step="0.1" min="2.0">
+                    </div>
+                    <div class="form-group">
+                        <label for="corridorLength">Длина коридора (м):</label>
+                        <input type="number" id="corridorLength" name="corridorLength" value="10" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="routingType">Тип прокладки:</label>
+                        <select id="routingType" name="routingType">
+                            <option value="internal">Внутренние стояки</option>
+                            <option value="external">Внешняя (фасад/чердак)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn">Рассчитать проект</button>
+            </form>
+        </aside>
+
+        <!-- Правая панель: Результаты и Визуализация -->
+        <main class="panel results-panel">
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="summary">Сводка и Смета</button>
+                <button class="tab-btn" data-tab="finance">Финансы (Прайс)</button>
+                <button class="tab-btn" data-tab="visual">Схема здания (Canvas)</button>
+            </div>
+
+            <!-- Вкладка 1: Сводка -->
+            <div id="summary" class="tab-content active">
+                <div class="cards-grid">
+                    <div class="card">
+                        <h3>Абонентская база</h3>
+                        <p>Всего абонентов: <strong id="res-total-subs">-</strong></p>
+                        <p>Технология: <strong id="res-tech">-</strong></p>
+                    </div>
+                    
+                    <div class="card" id="ftth-card" style="display: none;">
+                        <h3>Оборудование FTTH</h3>
+                        <p>Топология сплиттеров: <strong id="res-topology">-</strong></p>
+                        <p>Магистральные (1 ур): <span id="res-l1-splitters">-</span></p>
+                        <p>Этажные (2 ур): <span id="res-l2-splitters">-</span></p>
+                        <p>Оптический бюджет (Max): <strong class="highlight" id="res-budget">- дБ</strong></p>
+                    </div>
+                </div>
+
+                <div class="estimates">
+                    <div class="estimate-box pure">
+                        <h3>Чистый расчет кабеля (м)</h3>
+                        <ul>
+                            <li>Магистраль: <input type="number" id="est-pure-trunk" class="res-input"></li>
+                            <li>Распределительная: <input type="number" id="est-pure-dist" class="res-input"></li>
+                            <li>Горизонтальная: <input type="number" id="est-pure-horiz" class="res-input"></li>
+                            <li class="total">Итого: <span id="est-pure-total">-</span></li>
+                        </ul>
+                    </div>
+                    <div class="estimate-box reserve">
+                        <h3>Смета с запасом 15% (м)</h3>
+                        <ul>
+                            <li>Магистраль: <input type="number" id="est-res-trunk" class="res-input"></li>
+                            <li>Распределительная: <input type="number" id="est-res-dist" class="res-input"></li>
+                            <li>Горизонтальная: <input type="number" id="est-res-horiz" class="res-input"></li>
+                            <li class="total">Итого: <span id="est-res-total">-</span></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Вкладка 2: Финансы -->
+            <div id="finance" class="tab-content">
+                <div class="finance-summary">
+                    <h3>Общая стоимость материалов: <span id="res-total-cost" class="highlight">0 ₽</span></h3>
+                    <p>Средняя стоимость на абонента: <strong id="res-cost-per-sub">0 ₽</strong></p>
+                </div>
+                <div class="table-container">
+                    <table class="finance-table">
+                        <thead>
+                            <tr>
+                                <th>Наименование</th>
+                                <th>Кол-во</th>
+                                <th>Ед.</th>
+                                <th>Цена (₽)</th>
+                                <th>Сумма (₽)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="finance-tbody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Вкладка 3: Визуализация -->
+            <div id="visual" class="tab-content">
+                <div class="visual-actions">
+                    <span class="zoom-hint">Используйте колёсико мыши для масштабирования, зажмите для перемещения</span>
+                </div>
+                <div class="canvas-wrapper">
+                    <canvas id="buildingCanvas" width="800" height="600"></canvas>
+                </div>
+                <div class="legend">
+                    <span class="legend-item"><span class="color-box okr"></span> ОКР (Районный кабель)</span>
+                    <span class="legend-item"><span class="color-box rsh"></span> РШ (Распред. шкаф)</span>
+                    <span class="legend-item"><span class="color-box riser"></span> Стояк (Кабель-каналы)</span>
+                    <span class="legend-item"><span class="color-box kr"></span> КР (Распред. коробка)</span>
+                    <span class="legend-item"><span class="color-box kru"></span> КРУ (Протяжная коробка)</span>
+                    <span class="legend-item"><span class="color-box horiz"></span> Разводка по квартирам</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js?v=2"></script>
+</body>
+</html>
